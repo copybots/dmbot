@@ -195,10 +195,10 @@ async def on_message(message):
 
 									if errordelay == 1:
 										await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} second!**""".format(str(errordelay)))
-										await bot.send_message(message.channel, "```{0}```".format(e)
+										await bot.send_message(message.channel, "```{0}```".format(e))
 									else:
 										await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} seconds!**""".format(str(errordelay)))
-										await bot.send_message(message.channel, "```{0}```".format(e)
+										await bot.send_message(message.channel, "```{0}```".format(e))
 									await asyncio.sleep(errordelay)
 
 								except Exception:
