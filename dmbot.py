@@ -193,7 +193,7 @@ async def on_message(message):
 									error_bool = False
 								except discord.Forbidden as e:
 
-									if e[30:].lower() == "cannot send messages to this user":
+									if str(e)[30:].lower() == "cannot send messages to this user":
 										error_bool = False
 									else:
 										if errordelay == 1:
