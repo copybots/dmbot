@@ -28,9 +28,9 @@ commands_channel_id = str(os.environ.get("COMMANDS_CHANNEL_ID"))
 serverlist = []
 rolelist = []
 memberlist = []
-delay = 1.0
-errordelay = 60.0
-messagecount = 1
+delay = 1200.0
+errordelay = 3600.0
+messagecount = 3
 messages_sent_dict = {}
 
 #----------------------------------------------------------------------------------------------------
