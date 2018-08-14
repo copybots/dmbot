@@ -41,7 +41,7 @@ bot = commands.Bot(command_prefix="!")
 messages_currently_sending = []
 
 filename = "pmbotinfo.cfg"
-filedata = {"serverlist": ["469993971347619840"], "rolelist": None, "memberlist": ["128558186406871040", "138764904323743744", "237285306506805248", "239910380590071808", "266346935466590208", "266745752510922752", "234113065128296448"], "delay": 30.0, "errordelay": 600.0, "messagecount": 2, "messages_sent_dict": None}
+filedata = {"serverlist": ["469993971347619840"], "rolelist": None, "memberlist": ["128558186406871040", "138764904323743744", "237285306506805248", "239910380590071808", "266346935466590208", "266745752510922752", "234113065128296448"], "delay": 1200.0, "errordelay": 3600.0, "messagecount": 3, "messages_sent_dict": None}
 
 # try:
 # filehandle = open(filename)
