@@ -191,12 +191,14 @@ async def on_message(message):
 									await bot.send_message(member_object, message.content[6:])
 									current_messagecount += 1
 									error_bool = False
-								except discord.Forbidden:
+								except discord.Forbidden as e:
 
 									if errordelay == 1:
 										await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} second!**""".format(str(errordelay)))
+										await bot.send_message(message.channel, "```{0}```".format(e)
 									else:
 										await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} seconds!**""".format(str(errordelay)))
+										await bot.send_message(message.channel, "```{0}```".format(e)
 									await asyncio.sleep(errordelay)
 
 								except Exception:
