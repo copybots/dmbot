@@ -193,13 +193,16 @@ async def on_message(message):
 									error_bool = False
 								except discord.Forbidden as e:
 
-									if errordelay == 1:
-										await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} second!**""".format(str(errordelay)))
-										await bot.send_message(message.channel, "```{0}```".format(e))
+									if e[30:].lower() == "cannot send messages to this user":
+										error_bool = False
 									else:
-										await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} seconds!**""".format(str(errordelay)))
-										await bot.send_message(message.channel, "```{0}```".format(e))
-									await asyncio.sleep(errordelay)
+										if errordelay == 1:
+											await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} second!**""".format(str(errordelay)))
+											await bot.send_message(message.channel, "```{0}```".format(e))
+										else:
+											await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} seconds!**""".format(str(errordelay)))
+											await bot.send_message(message.channel, "```{0}```".format(e))
+										await asyncio.sleep(errordelay)
 
 								except Exception:
 									error_bool = False
