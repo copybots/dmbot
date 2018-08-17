@@ -285,7 +285,7 @@ async def on_message(message):
 
 							if current_messagecount == messagecount:
 								current_messagecount = 0
-								save_data(filedata)		#SAVE TO FILE
+								await save_data(filedata)		#SAVE TO FILE
 								await asyncio.sleep(delay)
 					if message.content[6:] in messages_currently_sending:
 						messages_currently_sending.remove(message.content[6:])
