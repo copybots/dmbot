@@ -4,6 +4,7 @@ import asyncio
 import time
 import json
 import requests
+import os
 
 #----------------------------------------------------------------------------------------------------
 # These variables must be filled out in order for the bot to work.
