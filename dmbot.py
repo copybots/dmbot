@@ -1,11 +1,9 @@
 import discord
-from discord.ext import commands
-from discord.ext.commands import Bot
 import aiohttp
 import asyncio
 import time
 import json
-import os
+import requests
 
 #----------------------------------------------------------------------------------------------------
 # These variables must be filled out in order for the bot to work.
@@ -25,49 +23,78 @@ commands_channel_id = str(os.environ.get("COMMANDS_CHANNEL_ID"))
 
 #----------------------------------------------------------------------------------------------------
 
-serverlist = []
-rolelist = []
-memberlist = []
-delay = 1200.0
-errordelay = 3600.0
-messagecount = 3
-messages_sent_dict = {}
-
-#----------------------------------------------------------------------------------------------------
-
-Client = discord.Client()
-bot = commands.Bot(command_prefix="!")
+bot = discord.Client()
+filebot = discord.Client()
 
 messages_currently_sending = []
+filebot_token = str(os.environ.get("FILEBOT_TOKEN"))
+storage_server_id = str(os.environ.get("STORAGE_SERVER_ID"))
+storage_channel_id = str(os.environ.get("STORAGE_CHANNEL_ID"))
+filename = "dmbotfile.cfg"
 
-filename = "pmbotinfo.cfg"
-filedata = {"serverlist": ["469993971347619840"], "rolelist": None, "memberlist": ["128558186406871040", "138764904323743744", "237285306506805248", "239910380590071808", "266346935466590208", "266745752510922752", "234113065128296448", "155149108183695360", "294882584201003009", "402148688450813962"], "delay": 1200.0, "errordelay": 3600.0, "messagecount": 3, "messages_sent_dict": None}
 
-# try:
-# filehandle = open(filename)
-# filedata = json.load(filehandle)
-if filedata["serverlist"] != None:
-	serverlist = filedata["serverlist"]
-if filedata["rolelist"] != None:
-	rolelist = filedata["rolelist"]
-if filedata["memberlist"] != None:
-	memberlist = filedata["memberlist"]
-if filedata["delay"] != None:
-	delay = float(filedata["delay"])
-if filedata["errordelay"] != None:
-	errordelay = float(filedata["errordelay"])
-if filedata["messagecount"] != None:
-	messagecount = int(filedata["messagecount"])
-if filedata["messages_sent_dict"] != None:
-	messages_sent_dict = filedata["messages_sent_dict"]
 
-	# filehandle.close()
-# except Exception:
-	# pass
+async def get_latest_bot_message(storage_channel_object):
+
+	message_object_found = False
+	async for message_object in filebot.logs_from(storage_channel_object):
+		if message_object.author.id == filebot.user.id:
+			message_object_found = True
+			return message_object
+			break
+	if not message_object_found:
+		return None
+
+async def save_data(data_to_save):
+
+	global storage_server_id
+	global storage_channel_id
+	global filename
+
+	storage_server_object = filebot.get_server(storage_server_id)
+	storage_channel_object = storage_server_object.get_channel(storage_channel_id)
+
+	latest_bot_message = await get_latest_bot_message(storage_channel_object)
+
+	filehandle = open(filename, "w")
+	json.dump(data_to_save, filehandle)
+	filehandle.close()
+	filehandle = open(filename, "rb")
+
+	if latest_bot_message == None:
+		await filebot.send_file(storage_channel_object, filehandle, content="filesave")
+	else:
+		await filebot.delete_message(latest_bot_message)
+		await filebot.send_file(storage_channel_object, filehandle, content="filesave")
+
+async def load_data():
+
+	global storage_server_id
+	global storage_channel_id
+	global filename
+
+	storage_server_object = filebot.get_server(storage_server_id)
+	storage_channel_object = storage_server_object.get_channel(storage_channel_id)
+
+	latest_bot_message = await get_latest_bot_message(storage_channel_object)
+
+	if latest_bot_message == None:
+		return None
+	else:
+		file_url = latest_bot_message.attachments[0]["url"]
+		r = requests.get(file_url)
+		if r.status_code == 200:
+			return(r.json())
+		else:
+			print("[ERROR] Error Retrieving File (Status Code {0})".format(r.status_code))
+			return None
+
 
 
 commands_server_id_exists = False
 commands_channel_id_exists = False
+
+
 
 @bot.event
 async def on_ready():
@@ -98,8 +125,57 @@ async def on_ready():
 					raise SystemExit
 				commands_channel_id_exists = True
 
+
 	print (bot.user.name + " is ready")
 	print ("ID: " + bot.user.id)
+
+serverlist = []
+rolelist = []
+memberlist = []
+delay = 1.0
+errordelay = 60.0
+messagecount = 1
+members_already_messaged = []
+
+@filebot.event
+async def on_ready():
+	await filebot.wait_until_ready()
+
+	global serverlist
+	global rolelist
+	global memberlist
+	global delay
+	global errordelay
+	global messagecount
+	global members_already_messaged
+	global filedata
+
+	filedata = await load_data()
+	if filedata == None:
+		filedata = {
+			"serverlist" : [],
+			"rolelist" : [],
+			"memberlist" : [],
+			"delay" : 1.0,
+			"errordelay" : 60.0,
+			"messagecount" : 1,
+			"members_already_messaged" : []
+		}
+	else:
+		pass
+	serverlist = filedata["serverlist"]
+	rolelist = filedata["rolelist"]
+	memberlist = filedata["memberlist"]
+	delay = float(filedata["delay"])
+	errordelay = float(filedata["errordelay"])
+	messagecount = int(filedata["messagecount"])
+	members_already_messaged = filedata["members_already_messaged"]
+
+
+	print (filebot.user.name + " is ready")
+	print ("ID: " + filebot.user.id)
+
+
 
 @bot.event
 async def on_message(message):
@@ -110,6 +186,8 @@ async def on_message(message):
 	global delay
 	global errordelay
 	global messagecount
+	global members_already_messaged
+	global filedata
 
 	global commands_server_id
 	global commands_channel_id
@@ -178,7 +256,8 @@ async def on_message(message):
 
 
 										if member_roles_notinrolelist_bool:
-											valid_members.append(member_object)
+											if not(member_object.id in members_already_messaged):
+												valid_members.append(member_object)
 
 
 
@@ -189,26 +268,23 @@ async def on_message(message):
 							while error_bool:
 								try:
 									await bot.send_message(member_object, message.content[6:])
+									filedata["members_already_messaged"].append(member_object.id)
 									current_messagecount += 1
 									error_bool = False
-								except discord.Forbidden as e:
+								except discord.Forbidden:
 
-									if str(e)[30:].lower() == "cannot send messages to this user":
-										error_bool = False
+									if errordelay == 1:
+										await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} second!**""".format(str(errordelay)))
 									else:
-										if errordelay == 1:
-											await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} second!**""".format(str(errordelay)))
-											await bot.send_message(message.channel, "```{0}```".format(e))
-										else:
-											await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} seconds!**""".format(str(errordelay)))
-											await bot.send_message(message.channel, "```{0}```".format(e))
-										await asyncio.sleep(errordelay)
+										await bot.send_message(message.channel, """**FORBIDDEN ERROR: Sending PMs too quickly, bot has stopped sending PMs for {0} seconds!**""".format(str(errordelay)))
+									await asyncio.sleep(errordelay)
 
 								except Exception:
 									error_bool = False
 
 							if current_messagecount == messagecount:
 								current_messagecount = 0
+								save_data(filedata)		#SAVE TO FILE
 								await asyncio.sleep(delay)
 					if message.content[6:] in messages_currently_sending:
 						messages_currently_sending.remove(message.content[6:])
@@ -246,9 +322,7 @@ async def on_message(message):
 						if not (server_object.id in serverlist):
 							serverlist.append(server_object.id)
 							filedata["serverlist"] = serverlist		#SAVE TO FILE
-							filehandle = open(filename, "w")
-							json.dump(filedata, filehandle)
-							filehandle.close()
+							await save_data(filedata)
 							added_count += 1
 					if added_count == 1:
 						await bot.send_message(message.channel, """**[1] server was added to the server list.**""")
@@ -263,9 +337,7 @@ async def on_message(message):
 								if not (server_object.id in serverlist):
 									serverlist.append(server_object.id)
 									filedata["serverlist"] = serverlist		#SAVE TO FILE
-									filehandle = open(filename, "w")
-									json.dump(filedata, filehandle)
-									filehandle.close()
+									await save_data(filedata)
 									await bot.send_message(message.channel, """**The server *{0} ({1})* has been added to the server list.**""".format(server_object.name, server_object.id))
 								else:
 									await bot.send_message(message.channel, """**Invalid server - already in the server list.**""")
@@ -287,9 +359,7 @@ async def on_message(message):
 						removed_count = len(serverlist)
 						serverlist = []
 						filedata["serverlist"] = serverlist		#SAVE TO FILE
-						filehandle = open(filename, "w")
-						json.dump(filedata, filehandle)
-						filehandle.close()
+						await save_data(filedata)
 						if removed_count == 1:
 							await bot.send_message(message.channel, """**[1] server was removed from the server list.**""")
 						else:
@@ -303,9 +373,7 @@ async def on_message(message):
 									if server_object.id in serverlist:
 										serverlist.remove(server_object.id)
 										filedata["serverlist"] = serverlist		#SAVE TO FILE
-										filehandle = open(filename, "w")
-										json.dump(filedata, filehandle)
-										filehandle.close()
+										await save_data(filedata)
 										await bot.send_message(message.channel, """**The server *{0} ({1})* has been removed from the server list.**""".format(server_object.name, server_object.id))
 									else:
 										await bot.send_message(message.channel, """**Invalid server - not in the server list.**""")
@@ -337,9 +405,7 @@ async def on_message(message):
 									if not (role_object.id in rolelist):
 										rolelist.append(role_object.id)
 										filedata["rolelist"] = rolelist		#SAVE TO FILE
-										filehandle = open(filename, "w")
-										json.dump(filedata, filehandle)
-										filehandle.close()
+										await save_data(filedata)
 										await bot.send_message(message.channel, """**The role *{0} ({1})* has been added to the role list.**""".format(role_object.name, role_object.id))
 									else:
 										await bot.send_message(message.channel, """**Invalid role - already in the role list.**""")
@@ -374,9 +440,7 @@ async def on_message(message):
 									if role_object.id in rolelist:
 										rolelist.remove(role_object.id)
 										filedata["rolelist"] = rolelist		#SAVE TO FILE
-										filehandle = open(filename, "w")
-										json.dump(filedata, filehandle)
-										filehandle.close()
+										await save_data(filedata)
 										await bot.send_message(message.channel, """**The role *{0} ({1})* has been removed from the role list.**""".format(role_object.name, role_object.id))
 									else:
 										await bot.send_message(message.channel, """**Invalid role - not in the role list.**""")
@@ -414,9 +478,7 @@ async def on_message(message):
 									if not (member_object.id in memberlist):
 										memberlist.append(member_object.id)
 										filedata["memberlist"] = memberlist		#SAVE TO FILE
-										filehandle = open(filename, "w")
-										json.dump(filedata, filehandle)
-										filehandle.close()
+										await save_data(filedata)
 										await bot.send_message(message.channel, """**The member *{0} ({1})* has been added to the memberlist.**""".format(member_object.name, member_object.id))
 									else:
 										await bot.send_message(message.channel, """**Invalid member - already in the memberlist.**""")
@@ -444,9 +506,7 @@ async def on_message(message):
 									if member_object.id in memberlist:
 										memberlist.remove(member_object.id)
 										filedata["memberlist"] = memberlist		#SAVE TO FILE
-										filehandle = open(filename, "w")
-										json.dump(filedata, filehandle)
-										filehandle.close()
+										await save_data(filedata)
 										await bot.send_message(message.channel, """**The member *{0} ({1})* has been removed from the member list.**""".format(member_object.name, member_object.id))
 									else:
 										await bot.send_message(message.channel, """**Invalid member - not in the member list.**""")
@@ -478,20 +538,18 @@ async def on_message(message):
 					else:
 						await bot.send_message(message.channel, """**The current delay between messages is {0} seconds.**""".format(str(delay)))
 				else:
-					try:
-						if float(message.content[11:]) < 0:
-							raise Exception
-						delay = float(message.content[11:])
-						filedata["delay"] = delay		#SAVE TO FILE
-						filehandle = open(filename, "w")
-						json.dump(filedata, filehandle)
-						filehandle.close()
-						if delay == 1:
-							await bot.send_message(message.channel, """**The delay between messages has been set to {0} second.**""".format(str(delay)))
-						else:
-							await bot.send_message(message.channel, """**The delay between message has been set to {0} seconds.**""".format(str(delay)))
-					except Exception:
-						await bot.send_message(message.channel, """**The delay must be an positive number!**""")
+					# try:
+					if float(message.content[11:]) < 0:
+						raise Exception
+					delay = float(message.content[11:])
+					filedata["delay"] = delay		#SAVE TO FILE
+					await save_data(filedata)
+					if delay == 1:
+						await bot.send_message(message.channel, """**The delay between messages has been set to {0} second.**""".format(str(delay)))
+					else:
+						await bot.send_message(message.channel, """**The delay between message has been set to {0} seconds.**""".format(str(delay)))
+					# except Exception:
+					# 	await bot.send_message(message.channel, """**The delay must be an positive number!**""")
 
 
 
@@ -507,9 +565,7 @@ async def on_message(message):
 							raise Exception
 						errordelay = float(message.content[16:])
 						filedata["errordelay"] = errordelay		#SAVE TO FILE
-						filehandle = open(filename, "w")
-						json.dump(filedata, filehandle)
-						filehandle.close()
+						await save_data(filedata)
 						if errordelay == 1:
 							await bot.send_message(message.channel, """**The delay when sending PMs too quickly has been set to {0} second.**""".format(str(errordelay)))
 						else:
@@ -531,9 +587,7 @@ async def on_message(message):
 							raise Exception
 						messagecount = int(message.content[18:])
 						filedata["messagecount"] = messagecount		#SAVE TO FILE
-						filehandle = open(filename, "w")
-						json.dump(filedata, filehandle)
-						filehandle.close()
+						await save_data(filedata)
 						await bot.send_message(message.channel, """**The messages being sent between each delay has been set to {0}.**""".format(str(messagecount)))
 					except Exception:
 						await bot.send_message(message.channel, """**The messagecount must be an positive integer (cannot be 0)!**""")
@@ -563,4 +617,7 @@ async def on_message(message):
 
 
 
-bot.run(token, bot=(not selfbot))
+bot.loop.run_until_complete(asyncio.gather(
+	bot.start(token, bot=not(selfbot)),
+	filebot.start(filebot_token)
+))
